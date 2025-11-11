@@ -21,7 +21,7 @@ Before you begin, make sure you have the following software installed on your ma
 
 *   [Git](https://git-scm.com/downloads)
 *   [Python](https://www.python.org/downloads/) (version 3.9 or higher)
-*   [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+*   [Docker](https://docs.docker.com/get-docker/)
 
 ## 2. Setup Steps
 

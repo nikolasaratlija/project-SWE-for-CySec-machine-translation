@@ -13,7 +13,7 @@ translation-system/
 └── README.md
 ```
 
-The project uses a microservice architecture orchestrated by Docker Compose. While the services run inside Docker containers, we will also set up a local Python virtual environment for IDE integration, linting, and code completion.
+The project uses a microservice architecture orchestrated by Docker Compose.
 
 ## 1. Prerequisites
 
@@ -21,7 +21,7 @@ Before you begin, make sure you have the following software installed on your ma
 
 *   [Git](https://git-scm.com/downloads)
 *   [Python](https://www.python.org/downloads/) (version 3.9 or higher)
-*   [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (Docker Desktop for Windows and Mac includes both).
+*   [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 
 ## 2. Setup Steps
 

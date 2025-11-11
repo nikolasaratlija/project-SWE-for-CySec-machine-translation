@@ -33,7 +33,7 @@ def create_app():
                 {'username': 'Nikola', 'password': 'password123'},
                 {'username': 'Debora', 'password': 'password123'},
                 {'username': 'Guido', 'password': 'password123'},
-                {'username': 'Rasheem', 'password': 'password123'}
+                {'username': 'Amreesh', 'password': 'password123'}
             ]
 
             for user_data in users_to_add:

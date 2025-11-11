@@ -1,0 +1,72 @@
+services:
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./api-gateway:/app
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - TRANSLATION_SERVICE_URL=http://translation-service:5002
+    depends_on:
+      - auth-service
+      - translation-service
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./auth-service:/app
+    environment:
+      - DATABASE_URL=postgresql://user:password@db-auth:5432/auth_db
+      - JWT_SECRET_KEY=my-super-secret-key-that-should-be-in-a-vault
+      - FLASK_APP=app.py
+    depends_on:
+      db-auth:
+        condition: service_healthy
+
+  translation-service:
+    build: ./translation-service
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./translation-service:/app
+    environment:
+      - DATABASE_URL=postgresql://user:password@db-translation:5432/translation_db
+      - FLASK_APP=app.py
+    depends_on:
+      db-translation:
+        condition: service_healthy
+
+  db-auth:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=auth_db
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db-translation:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=translation_db
+    volumes:
+      - translation_db_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d translation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  auth_db_data:
+  translation_db_data:

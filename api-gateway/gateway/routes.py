@@ -60,7 +60,7 @@ def translate():
             json=request.get_json(),
             headers=forward_headers
         )
-        translation_response.raise_for_status()
+        
         return jsonify(translation_response.json()), translation_response.status_code
     except requests.exceptions.RequestException as e:
         return jsonify(message=f"Error with translation service: {str(e)}"), 503

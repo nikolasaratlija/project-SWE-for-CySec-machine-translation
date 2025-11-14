@@ -1,102 +1,54 @@
 import os
-import html  # voor simpele sanitization
+import html
 import requests
 from flask import Blueprint, request, jsonify
 
 gateway_bp = Blueprint('gateway_bp', __name__)
 
-# Get the internal URL of the auth service from environment variables
+# Internal URLs for the microservices, set via environment variables
 AUTH_SERVICE_URL = os.environ.get('AUTH_SERVICE_URL')
 TRANSLATION_SERVICE_URL = os.environ.get('TRANSLATION_SERVICE_URL')
 
 
-def sanitize_string(value: str) -> str:
+def sanitize_value(value):
     """
-    Strip whitespace en escape gevaarlijke tekens.
+    Algemene sanitization:
+    - Strings: strip whitespace + HTML escape
+    - Lijsten/dicts: recursief sanitizen
     """
-    if not isinstance(value, str):
-        return value
-    # verwijder spaties aan begin/einde en escape HTML
-    return html.escape(value.strip())
-
-
-def validate_login_payload(json_data):
-    """
-    Valideer input voor /login.
-    """
-    if not json_data:
-        return False, ("Invalid JSON body", 400)
-
-    username = json_data.get("username")
-    password = json_data.get("password")
-
-    # verplichte velden
-    if username is None or password is None:
-        return False, ("'username' and 'password' are required", 400)
-
-    # type-checks
-    if not isinstance(username, str) or not isinstance(password, str):
-        return False, ("'username' and 'password' must be strings", 400)
-
-    # simpele lengte-checks (optioneel, maar netjes)
-    if len(username.strip()) == 0 or len(password.strip()) == 0:
-        return False, ("'username' and 'password' cannot be empty", 400)
-
-    # alles ok
-    return True, {
-        "username": sanitize_string(username),
-        "password": password.strip(),  # wachtwoord niet HTML-escapen
-    }
-
-
-def validate_translate_payload(json_data):
-    """
-    Valideer input voor /translate.
-    """
-    if not json_data:
-        return False, ("Invalid JSON body", 400)
-
-    text = json_data.get("text")
-
-    if text is None:
-        return False, ("'text' field is required", 400)
-
-    if not isinstance(text, str):
-        return False, ("'text' must be a string", 400)
-
-    text = sanitize_string(text)
-
-    # leeg + max lengte check
-    if len(text) == 0:
-        return False, ("'text' cannot be empty", 400)
-
-    if len(text) > 2000:
-        return False, ("'text' is too long (max 2000 characters)", 400)
-
-    return True, {"text": text}
+    if isinstance(value, str):
+        # trim en escape gevaarlijke tekens zoals <, >, ", '
+        return html.escape(value.strip())
+    if isinstance(value, list):
+        return [sanitize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: sanitize_value(v) for k, v in value.items()}
+    return value
 
 
 @gateway_bp.route('/login', methods=['POST'])
 def login():
-    """Validates and forwards login request to the Authentication Service."""
+    """
+    Sanitize & forward login request to the Authentication Service.
+
+    Let op:
+    - De API-gateway doet alleen algemene JSON-check + sanitization.
+    - Business logic / veldspecifieke validatie (username/password) gebeurt
+      in de auth-service zelf, i.p.v. hier.
+    """
     try:
-        incoming_json = request.get_json()
+        data = request.get_json()
+        if data is None:
+            return jsonify({"message": "Invalid JSON body"}), 400
 
-        # 🔒 Input validation & sanitization
-        ok, result = validate_login_payload(incoming_json)
-        if not ok:
-            message, status = result
-            return jsonify({"message": message}), status
+        sanitized_payload = sanitize_value(data)
 
-        sanitized_payload = result
-
-        # Forward the request with sanitized data
         response = requests.post(
             f"{AUTH_SERVICE_URL}/login",
             json=sanitized_payload
         )
-
         return jsonify(response.json()), response.status_code
+
     except requests.exceptions.RequestException as e:
         # Handle network errors or if the auth service is down
         return jsonify(message=str(e)), 503  # Service Unavailable
@@ -107,8 +59,10 @@ def translate():
     """
     Orchestrates the translation process:
     1. Validates token with Auth Service.
-    2. Validates and sanitizes text input.
-    3. If valid, forwards request to Translation Service with User ID.
+    2. Sanitizes the JSON body.
+    3. Forwards request to Translation Service with User ID.
+
+    Veldspecifieke validatie van 'text' gebeurt in de translation-service.
     """
     # Step 1: Validate the token
     auth_header = request.headers.get('Authorization')
@@ -126,14 +80,12 @@ def translate():
     except requests.exceptions.RequestException:
         return jsonify({"message": "Invalid or expired token"}), 401
 
-    # Step 2: Validate & sanitize request body
-    incoming_json = request.get_json()
-    ok, result = validate_translate_payload(incoming_json)
-    if not ok:
-        message, status = result
-        return jsonify({"message": message}), status
+    # Step 2: Sanitize JSON body (geen text-specific business rules hier)
+    data = request.get_json()
+    if data is None:
+        return jsonify({"message": "Invalid JSON body"}), 400
 
-    sanitized_payload = result
+    sanitized_payload = sanitize_value(data)
 
     # Step 3: Forward the request to the Translation Service
     try:
@@ -150,5 +102,6 @@ def translate():
         )
         translation_response.raise_for_status()
         return jsonify(translation_response.json()), translation_response.status_code
+
     except requests.exceptions.RequestException as e:
         return jsonify(message=f"Error with translation service: {str(e)}"), 503

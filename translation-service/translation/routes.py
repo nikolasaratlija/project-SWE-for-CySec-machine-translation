@@ -12,13 +12,36 @@ def translate():
         return jsonify({"message": "X-User-ID header is required"}), 400
 
     data = request.get_json()
+
+    # 1. Check of er überhaupt JSON is
+    if not data:
+        return jsonify({"message": "Invalid JSON body"}), 400
+
+    # 2. Haal text eruit
     source_text = data.get('text')
-    if not source_text:
+
+    # 3. Verplichte veld
+    if source_text is None:
         return jsonify({"message": "Text to translate is required"}), 400
+
+    # 4. Type-check
+    if not isinstance(source_text, str):
+        return jsonify({"message": "'text' must be a string"}), 400
+
+    # 5. Leeg-check
+    if len(source_text.strip()) == 0:
+        return jsonify({"message": "Text to translate cannot be empty"}), 400
+
+    # 6. Optioneel: lengte-limiet voor performance / veiligheid
+    if len(source_text) > 2000:
+        return jsonify({"message": "Text to translate is too long (max 2000 characters)"}), 400
+
+    # 7. Normaliseer de tekst (bijv. whitespace weghalen aan de randen)
+    source_text = source_text.strip()
 
     # MOCKED TRANSLATION LOGIC
     # In a real system, you would call an external API here.
-    translated_text = source_text # Just echoing for now
+    translated_text = source_text  # Just echoing for now
 
     # Save the translation to the database
     try:

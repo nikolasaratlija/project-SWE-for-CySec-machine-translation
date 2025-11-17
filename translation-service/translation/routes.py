@@ -13,11 +13,10 @@ def translate():
 
     data = request.get_json()
 
-    # 1. check for json
+    # check for json
     if not data:
         return jsonify({"message": "Invalid JSON body"}), 400
 
-    # 2. Haal text eruit
     source_text = data.get('text')
     target_language = data.get('target_language')
 

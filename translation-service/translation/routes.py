@@ -12,6 +12,12 @@ def translate():
         return jsonify({"message": "X-User-ID header is required"}), 400
 
     data = request.get_json()
+
+    # 1. check for json
+    if not data:
+        return jsonify({"message": "Invalid JSON body"}), 400
+
+    # 2. Haal text eruit
     source_text = data.get('text')
     target_language = data.get('target_language')
 
@@ -20,6 +26,17 @@ def translate():
 
     if not source_text:
         return jsonify({"message": "Text to translate is required"}), 400
+
+    # Type-check
+    if not isinstance(source_text, str):
+        return jsonify({"message": "'text' must be a string"}), 400
+
+    # length limit
+    if len(source_text) > 2000:
+        return jsonify({"message": "Text to translate is too long (max 2000 characters)"}), 400
+
+    # normalise
+    source_text = source_text.strip()
 
     # Call Ollama for translation
     try:

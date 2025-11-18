@@ -1,23 +1,57 @@
-import os
 import html
 import requests
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.exceptions import BadRequest
 
 gateway_bp = Blueprint('gateway_bp', __name__)
 
-# Internal URLs for the microservices, set via environment variables
-AUTH_SERVICE_URL = os.environ.get('AUTH_SERVICE_URL')
-TRANSLATION_SERVICE_URL = os.environ.get('TRANSLATION_SERVICE_URL')
+
+# catches malformed JSON for the whole blueprint.
+@gateway_bp.app_errorhandler(BadRequest)
+def handle_bad_request(e):
+    """Catch 400 Bad Request and return a JSON response."""
+    return jsonify({"message": "The request body contains invalid or malformed JSON."}), 400
+
+
+def _forward_request(method, url, **kwargs):
+    """
+    A secure wrapper for making requests to internal services.
+    It handles network errors and masks 5xx server errors.
+    
+    Returns:
+        - On success: The 'requests.Response' object.
+        - On failure: A Flask response tuple (dict, status_code).
+    """
+    try:
+        response = requests.request(method, url, **kwargs)
+
+        # service returns a server error, log and return a generic server error to client
+        if 500 <= response.status_code < 600:
+            current_app.logger.error(
+                f"Internal service at {url} failed with status {response.status_code}. "
+                f"Response: {response.text}"
+            )
+            generic_error = (jsonify({
+                "error": "Internal Server Error",
+                "message": "An unexpected error occurred on the server."
+            }), 500)
+            return None, generic_error
+
+        return response, None
+
+    # if server is unreachable or down
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Could not connect to internal service at {url}. Error: {e}")
+        service_unavailable_error = (jsonify({
+            "error": "Service Unavailable",
+            "message": "A required downstream service is currently unavailable."
+        }), 503)
+        return None, service_unavailable_error
 
 
 def sanitize_value(value):
-    """
-    Algemene sanitization:
-    - Strings: strip whitespace + HTML escape
-    - Lijsten/dicts: recursief sanitizen
-    """
+    """General sanitization for input values."""
     if isinstance(value, str):
-        # trim en escape gevaarlijke tekens zoals <, >, ", '
         return html.escape(value.strip())
     if isinstance(value, list):
         return [sanitize_value(v) for v in value]
@@ -26,82 +60,79 @@ def sanitize_value(value):
     return value
 
 
+# --- API Endpoints ---
 @gateway_bp.route('/login', methods=['POST'])
 def login():
-    """
-    Sanitize & forward login request to the Authentication Service.
+    """Sanitize & forward login request to the Authentication Service."""
+    data = request.get_json()
+    if data is None:
+        return jsonify({"message": "Invalid or missing JSON body"}), 400
 
-    Let op:
-    - De API-gateway doet alleen algemene JSON-check + sanitization.
-    - Business logic / veldspecifieke validatie (username/password) gebeurt
-      in de auth-service zelf, i.p.v. hier.
-    """
-    try:
-        data = request.get_json()
-        if data is None:
-            return jsonify({"message": "Invalid JSON body"}), 400
+    sanitized_payload = sanitize_value(data)
 
-        sanitized_payload = sanitize_value(data)
+    # Get URL from the current app's configuration
+    auth_service_url = current_app.config['AUTH_SERVICE_URL']
 
-        response = requests.post(
-            f"{AUTH_SERVICE_URL}/login",
-            json=sanitized_payload
-        )
-        return jsonify(response.json()), response.status_code
+    response, error_response = _forward_request(
+        'POST',
+        f"{auth_service_url}/login",
+        json=sanitized_payload
+    )
 
-    except requests.exceptions.RequestException as e:
-        # Handle network errors or if the auth service is down
-        return jsonify(message=str(e)), 503  # Service Unavailable
+    if error_response:
+        return error_response
+
+    return jsonify(response.json()), response.status_code
 
 
 @gateway_bp.route('/translate', methods=['POST'])
 def translate():
-    """
-    Orchestrates the translation process:
-    1. Validates token with Auth Service.
-    2. Sanitizes the JSON body.
-    3. Forwards request to Translation Service with User ID.
-
-    Veldspecifieke validatie van 'text' gebeurt in de translation-service.
-    """
-    # Step 1: Validate the token
+    """Orchestrates the translation process securely."""
     auth_header = request.headers.get('Authorization')
     if not auth_header:
         return jsonify({"message": "Authorization header is required"}), 401
+    
+    # Get URLs from the current app's configuration
+    auth_service_url = current_app.config['AUTH_SERVICE_URL']
+    translation_service_url = current_app.config['TRANSLATION_SERVICE_URL']
 
     try:
         validation_response = requests.get(
-            f"{AUTH_SERVICE_URL}/validate",
+            f"{auth_service_url}/validate",
             headers={'Authorization': auth_header}
         )
-        validation_response.raise_for_status()
-        # Extract the user ID from the successful validation response
+        validation_response.raise_for_status() 
         user_id = validation_response.json().get('user_id')
-    except requests.exceptions.RequestException:
-        return jsonify({"message": "Invalid or expired token"}), 401
 
-    # Step 2: Sanitize JSON body (geen text-specific business rules hier)
-    data = request.get_json()
-    if data is None:
-        return jsonify({"message": "Invalid JSON body"}), 400
-
-    sanitized_payload = sanitize_value(data)
-
-    # Step 3: Forward the request to the Translation Service
-    try:
-        # Create new headers, passing the validated user ID securely
-        forward_headers = {
-            'X-User-ID': user_id,
-            'Content-Type': 'application/json'
-        }
-
-        translation_response = requests.post(
-            f"{TRANSLATION_SERVICE_URL}/translate",
-            json=sanitized_payload,
-            headers=forward_headers
-        )
-        translation_response.raise_for_status()
-        return jsonify(translation_response.json()), translation_response.status_code
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            return jsonify({"message": "Invalid or expired token"}), 401
+        current_app.logger.error(f"Auth service returned an error during validation: {e}")
+        return jsonify({"message": "Could not validate token due to a server error."}), 500
 
     except requests.exceptions.RequestException as e:
-        return jsonify(message=f"Error with translation service: {str(e)}"), 503
+        current_app.logger.error(f"Could not connect to auth service for validation: {e}")
+        return jsonify({"message": "Authentication service is unavailable."}), 503
+
+    data = request.get_json()
+    if data is None:
+        return jsonify({"message": "Invalid or missing JSON body"}), 400
+    
+    sanitized_payload = sanitize_value(data)
+
+    forward_headers = {
+        'X-User-ID': user_id,
+        'Content-Type': 'application/json'
+    }
+
+    response, error_response = _forward_request(
+        'POST',
+        f"{translation_service_url}/translate",
+        json=sanitized_payload,
+        headers=forward_headers
+    )
+
+    if error_response:
+        return error_response
+
+    return jsonify(response.json()), response.status_code

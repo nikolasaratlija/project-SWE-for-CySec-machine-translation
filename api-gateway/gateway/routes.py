@@ -120,10 +120,21 @@ def translate():
     
     sanitized_payload = sanitize_value(data)
 
-    forward_headers = {
-        'X-User-ID': user_id,
-        'Content-Type': 'application/json'
-    }
+    # Step 3: Forward the request to the Translation Service
+    try:
+        # Create new headers, passing the validated user ID securely
+        forward_headers = {
+            'X-User-ID': user_id,
+            'Content-Type': 'application/json'
+        }
+
+        translation_response = requests.post(
+            f"{TRANSLATION_SERVICE_URL}/translate",
+            json=sanitized_payload,
+            headers=forward_headers
+        )
+        
+        return jsonify(translation_response.json()), translation_response.status_code
 
     response, error_response = _forward_request(
         'POST',

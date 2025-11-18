@@ -85,7 +85,6 @@ def login():
     return jsonify(response.json()), response.status_code
 
 
-@gateway_bp.route('/translate', methods=['POST'])
 def translate():
     """Orchestrates the translation process securely."""
     auth_header = request.headers.get('Authorization')
@@ -120,21 +119,10 @@ def translate():
     
     sanitized_payload = sanitize_value(data)
 
-    # Step 3: Forward the request to the Translation Service
-    try:
-        # Create new headers, passing the validated user ID securely
-        forward_headers = {
-            'X-User-ID': user_id,
-            'Content-Type': 'application/json'
-        }
-
-        translation_response = requests.post(
-            f"{TRANSLATION_SERVICE_URL}/translate",
-            json=sanitized_payload,
-            headers=forward_headers
-        )
-        
-        return jsonify(translation_response.json()), translation_response.status_code
+    forward_headers = {
+        'X-User-ID': user_id,
+        'Content-Type': 'application/json'
+    }
 
     response, error_response = _forward_request(
         'POST',

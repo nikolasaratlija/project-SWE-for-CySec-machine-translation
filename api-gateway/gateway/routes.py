@@ -85,6 +85,7 @@ def login():
     return jsonify(response.json()), response.status_code
 
 
+@gateway_bp.route('/translate', methods=['POST'])
 def translate():
     """Orchestrates the translation process securely."""
     auth_header = request.headers.get('Authorization')

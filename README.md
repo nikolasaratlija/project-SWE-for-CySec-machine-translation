@@ -54,6 +54,24 @@ pip install -r api-gateway/requirements.txt
 pip install -r auth-service/requirements.txt
 pip install -r translation-service/requirements.txt
 ```
+
+### Step: Generate Local SSL Certificates:
+The Nginx service requires SSL certificates to run. These are not stored in the repository for security reasons. Run the following command to generate self-signed certificates:
+
+```bash
+# Create the directory for the certificates
+mkdir certs
+
+# Generate the key and certificate
+openssl req -x509 -newkey rsa:4096 -nodes \
+    -keyout certs/privkey.pem \
+    -out certs/fullchain.pem \
+    -sha256 -days 365 \
+    -subj "/CN=localhost"
+```
+*(Note: The `-subj "/CN=localhost"` part pre-fills the certificate questions, making it a non-interactive command.)*
+
+
 ### Step 3: Build the Docker Images
 
 This command reads the `Dockerfile` in each service's directory and builds the Docker images.

@@ -35,9 +35,12 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:password@db-translation:5432/translation_db
       - FLASK_APP=app.py
+      - OLLAMA_API_URL=http://ollama:11434/api/generate
     depends_on:
       db-translation:
         condition: service_healthy
+      ollama-setup:
+        condition: service_completed_successfully
 
   db-auth:
     image: postgres:13
@@ -69,6 +72,29 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  ollama-setup:
+    image: appropriate/curl
+    command: >
+      sh -c "
+      echo 'Waiting for Ollama to be ready...' &&
+      until curl -s http://ollama:11434 > /dev/null; do
+        sleep 1
+      done &&
+      echo 'Ollama is ready. Pulling model...' &&
+      curl http://ollama:11434/api/pull -d '{\"name\": \"llama3\"}' &&
+      echo 'Model pulled successfully.'
+      "
+    depends_on:
+      - ollama
+
 volumes:
   auth_db_data:
   translation_db_data:
+  ollama_data:

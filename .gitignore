@@ -5,3 +5,4 @@
 **/__pycache__/
 pyvenv.cfg
 .venv
+**/.pytest_cache/

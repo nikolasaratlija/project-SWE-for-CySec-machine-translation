@@ -6,7 +6,9 @@ AUTH_URL = "http://localhost:5001" # Authetication URL
 
 
 def login():
-    while True:
+    max_attempts = 3
+    attempts = 0
+    while attempts < max_attempts:
         print("Welcome to the translation app")
         username = input("Username: ")
         password = getpass.getpass("Password: ")
@@ -29,6 +31,7 @@ def login():
                     return token
                 else:
                     print("Login failed due to wrong totp code")
+                    attempts += 1
                     continue
             else:
                 print(response.json()["message"])
@@ -36,7 +39,13 @@ def login():
                 return token
         else:
             print(response.json()["message"])
+            attempts += 1
             continue
+    if attempts == max_attempts:
+        print("Too much attemps. Try again later")
+        return None
+        #TODO: implement block of user
+        
 
 def translate(token):
     text = input("Text to translate: ")

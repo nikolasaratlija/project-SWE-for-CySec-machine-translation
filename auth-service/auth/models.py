@@ -11,6 +11,9 @@ class User(db.Model):
     username = db.Column(db.String(128), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    totp_secret = db.Column(db.String(32), nullable=True)   # Base32 secret for TOTP
+    is_2fa_enabled = db.Column(db.Boolean, nullable=False, default=False)
+
 
     def __init__(self, username, password, is_admin=False):
         self.username = username

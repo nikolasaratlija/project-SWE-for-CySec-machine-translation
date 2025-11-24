@@ -32,6 +32,9 @@ def create_app():
     def init_db():
         """Creates database tables and seeds it with initial users."""
         with app.app_context():
+            print("Dropping all tables...")
+            db.drop_all()
+
             db.create_all()
             print("Database tables created.")
 
@@ -48,7 +51,9 @@ def create_app():
                     user = User(
                         username=user_data['username'],
                         password=user_data['password'],
-                        is_admin=user_data.get('is_admin', False)
+                        is_admin=user_data.get('is_admin', False),
+                        totp_secret=user_data.get('totp_secret', None),
+                        is_2fa_enabled=user_data.get('is_2fa_enabled', False)
                     )
                     db.session.add(user)
                     print(f"User '{user_data['username']}' created.")

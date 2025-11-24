@@ -2,7 +2,6 @@ import requests
 import getpass
 
 API_URL = "http://localhost:5000"  # Gateway URL
-AUTH_URL = "http://localhost:5001" # Authetication URL
 
 
 def login():
@@ -23,7 +22,7 @@ def login():
             if response.json().get("2fa_required"):
                 print("2FA required. Please enter your 6-digit code.")
                 totp_code = input("TOTP code: ")
-                totp_response = requests.post(f"{AUTH_URL}/login/totp", json={"user_id": response.json()["user_id"], "totp_code": totp_code})
+                totp_response = requests.post(f"{API_URL}/login/totp", json={"user_id": response.json()["user_id"], "totp_code": totp_code})
 
                 if totp_response.status_code == 200:
                     print(totp_response.json()["message"])
@@ -34,7 +33,6 @@ def login():
                     attempts += 1
                     continue
             else:
-                print(response.json()["message"])
                 token = response.json()["access_token"]
                 return token
         else:
@@ -49,16 +47,22 @@ def login():
 
 def translate(token):
     text = input("Text to translate: ")
-    # TODO: Select target language
-    # print("\n Select target language")
-    # print("1. Bulgarian")
-    # print("2. Dutch")
-    # target_lang = input("Select option: ")
+    print("\n Select target language")
+    print("1. Bulgarian")
+    print("2. Dutch")
+    target_lang = input("Select option: ")
+
+    if target_lang == '1':
+        target_lang = 'bg'
+    elif target_lang == '2':
+        target_lang = 'nl'
+    else:
+        print("try again")
 
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.post(f"{API_URL}/translate", json={
         "text": text,
-        #"target_lang": target_lang
+        "target_language": target_lang
     }, headers=headers)
 
     if response.status_code == 200:
@@ -68,7 +72,7 @@ def translate(token):
 
 def enable_2fa(token):
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.post(f"{AUTH_URL}/enable-2fa", headers=headers)
+    response = requests.post(f"{API_URL}/enable-2fa", headers=headers)
 
     # If backend returns JSON with TOTP info:
     if response.status_code == 200:
@@ -78,7 +82,7 @@ def enable_2fa(token):
 
 def logout(token):
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.post(f"{AUTH_URL}/logout", headers=headers)
+    response = requests.post(f"{API_URL}/logout", headers=headers)
     if response.status_code == 200:
         print(response.json().get("messg"))
         return None

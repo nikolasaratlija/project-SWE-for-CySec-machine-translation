@@ -15,10 +15,13 @@ class User(db.Model):
     is_2fa_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
 
-    def __init__(self, username, password, is_admin=False):
+    def __init__(self, username, password, is_admin=False, totp_secret=None, is_2fa_enabled=False):
         self.username = username
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
         self.is_admin = is_admin
+        self.totp_secret = totp_secret
+        self.is_2fa_enabled = is_2fa_enabled
+
 
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)

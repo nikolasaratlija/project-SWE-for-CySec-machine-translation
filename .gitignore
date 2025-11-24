@@ -4,4 +4,6 @@
 /Scripts
 **/__pycache__/
 pyvenv.cfg
+.venv
 **/.pytest_cache/
+/certs

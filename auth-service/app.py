@@ -1,12 +1,50 @@
 import os
-from flask import Flask
+from flask import Flask, request
 from flask_migrate import Migrate
 from auth.models import db, User
 from auth.routes import auth_bp
+from logging.config import dictConfig
 from flask_jwt_extended import JWTManager
+
+
+dictConfig({
+    'version': 1,
+    'formatters': {
+        'json': {
+            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(name)s %(levelname)s %(message)s %(module)s %(lineno)d'
+        }
+    },
+    'handlers': {
+        'wsgi': {
+            'class': 'logging.StreamHandler',
+            'stream': 'ext://flask.logging.wsgi_errors_stream',
+            'formatter': 'json'
+        }
+    },
+    'root': {
+        'level': 'INFO',
+        'handlers': ['wsgi']
+    }
+})
+
 
 def create_app():
     app = Flask(__name__)
+
+    @app.after_request
+    def log_request_info(response):
+        app.logger.info(
+            "Request finished",
+            extra={
+                'remote_addr': request.remote_addr,
+                'method': request.method,
+                'path': request.path,
+                'status_code': response.status_code,
+                'content_length': response.content_length,
+            }
+        )
+        return response
 
     # --- Configuration ---
     # Load environment variables from a .env file if it exists

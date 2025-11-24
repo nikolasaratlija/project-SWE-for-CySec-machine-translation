@@ -5,7 +5,9 @@ from werkzeug.exceptions import BadRequest
 
 gateway_bp = Blueprint('gateway_bp', __name__)
 
-# Catches malformed JSON for the whole blueprint.
+# --- Error Handling & Helpers ---
+
+# catches malformed JSON for the whole blueprint.
 @gateway_bp.app_errorhandler(BadRequest)
 def handle_bad_request(e):
     """Catch 400 Bad Request and return a JSON response."""
@@ -31,6 +33,7 @@ def _forward_request(method, url, **kwargs):
         response = requests.request(method, url, **kwargs)
 
         # Service returns a server error, log and return a generic server error to client
+        # If service returns a server error (5xx)
         if 500 <= response.status_code < 600:
             current_app.logger.error(
                 f"Downstream service error",
@@ -40,11 +43,10 @@ def _forward_request(method, url, **kwargs):
                     'response_body': response.text
                 }
             )
-            generic_error = (jsonify({
+            return None, (jsonify({
                 "error": "Internal Server Error",
                 "message": "An unexpected error occurred on the server."
             }), 500)
-            return None, generic_error
 
         return response, None
 
@@ -100,6 +102,79 @@ def login():
     return jsonify(response.json()), response.status_code
 
 
+@gateway_bp.route('/login/totp', methods=['POST'])
+def login_totp():
+    """
+    Forward the TOTP 2FA verification to the Auth Service.
+    """
+    data = request.get_json()
+    if data is None:
+        return jsonify({"message": "Invalid or missing JSON body"}), 400
+
+    # Sanitize inputs (user_id and totp_code)
+    sanitized_payload = sanitize_value(data)
+    auth_service_url = current_app.config['AUTH_SERVICE_URL']
+
+    response, error_response = _forward_request(
+        'POST',
+        f"{auth_service_url}/login/totp",
+        json=sanitized_payload
+    )
+
+    if error_response:
+        return error_response
+
+    return jsonify(response.json()), response.status_code
+
+
+@gateway_bp.route('/enable-2fa', methods=['POST'])
+def enable_2fa():
+    """
+    Proxies the enable-2fa request. 
+    We forward the Authorization header so the Auth Service can validate the user.
+    """
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({"message": "Authorization header is required"}), 401
+
+    auth_service_url = current_app.config['AUTH_SERVICE_URL']
+    
+    # Pass the Auth header downstream
+    response, error_response = _forward_request(
+        'POST',
+        f"{auth_service_url}/enable-2fa",
+        headers={'Authorization': auth_header}
+    )
+
+    if error_response:
+        return error_response
+
+    return jsonify(response.json()), response.status_code
+
+
+@gateway_bp.route('/logout', methods=['POST'])
+def logout():
+    """
+    Proxies the logout request.
+    """
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({"message": "Authorization header is required"}), 401
+
+    auth_service_url = current_app.config['AUTH_SERVICE_URL']
+
+    response, error_response = _forward_request(
+        'POST',
+        f"{auth_service_url}/logout",
+        headers={'Authorization': auth_header}
+    )
+
+    if error_response:
+        return error_response
+
+    return jsonify(response.json()), response.status_code
+
+
 @gateway_bp.route('/translate', methods=['POST'])
 def translate():
     """Orchestrates the translation process securely."""
@@ -113,6 +188,7 @@ def translate():
     translation_service_url = current_app.config['TRANSLATION_SERVICE_URL']
     user_id = None
 
+    # 1. Validate Token with Auth Service
     try:
         # Step 1: Validate token with Auth Service
         validation_response = requests.get(
@@ -135,14 +211,16 @@ def translate():
         current_app.logger.critical(f"Could not connect to auth service for validation: {e}")
         return jsonify({"message": "Authentication service is unavailable."}), 503
 
+    # 2. Sanitize Payload
     data = request.get_json()
     if data is None:
         return jsonify({"message": "Invalid or missing JSON body"}), 400
     
     sanitized_payload = sanitize_value(data)
 
+    # 3. Forward to Translation Service with User ID injected
     forward_headers = {
-        'X-User-ID': user_id,
+        'X-User-ID': str(user_id),
         'Content-Type': 'application/json'
     }
 

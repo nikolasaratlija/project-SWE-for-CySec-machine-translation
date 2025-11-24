@@ -65,6 +65,8 @@ services:
       - POSTGRES_DB=auth_db
     volumes:
       - auth_db_data:/var/lib/postgresql/data/
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d auth_db"]
       interval: 5s
@@ -106,6 +108,15 @@ services:
       "
     depends_on:
       - ollama
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    ports:
+      - "8080:8080"  # Expose Dozzle's web UI on port 8080
+    volumes:
+      # Mount the Docker socket to allow Dozzle to find other containers
+      - /var/run/docker.sock:/var/run/docker.sock 
 
 volumes:
   auth_db_data:

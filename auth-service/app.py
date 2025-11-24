@@ -29,7 +29,7 @@ dictConfig({
 })
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__)
 
     @app.after_request
@@ -46,16 +46,21 @@ def create_app():
         )
         return response
 
-    # --- Configuration ---
+    # --- 1. Default Configuration ---
     # Load environment variables from a .env file if it exists
     # In docker-compose, we set these variables directly.
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL',
-    'postgresql://user:password@localhost:5432/auth_db'
+        'DATABASE_URL',
+        'postgresql://user:password@localhost:5432/auth_db'
     )
     app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
     app.config['JWT_BLACKLIST_ENABLED'] = True
     app.config['JWT_BLACKLIST_TOKEN_CHECKS'] = ['access', 'refresh']
+
+    # --- 2. Apply Test Config (If present) ---
+    # This overrides the defaults above BEFORE extensions load
+    if test_config:
+        app.config.update(test_config)
 
     # --- Extensions ---
     db.init_app(app)

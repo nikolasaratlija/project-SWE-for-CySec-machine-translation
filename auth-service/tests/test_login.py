@@ -1,3 +1,4 @@
+# integration tests
 def test_login_successful(client, init_database):
     """Test standard login with correct credentials."""
     response = client.post('/login', json={
@@ -30,11 +31,11 @@ def test_login_triggers_2fa(client, init_database):
     assert 'user_id' in response.json
 
 
+# unit tests
 def test_login_validation_missing_json(client):
     """No JSON body."""
     response = client.post('/login')
     assert response.status_code == 415
-    # assert "Invalid JSON body" in response.json['message']
 
 
 def test_login_validation_missing_fields(client):

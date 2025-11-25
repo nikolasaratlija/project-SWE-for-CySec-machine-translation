@@ -2,6 +2,7 @@ from unittest.mock import patch, MagicMock
 import requests
 
 
+# unit tests
 def test_login_success(client):
     """Test successful login."""
     # Mock the response from the auth service

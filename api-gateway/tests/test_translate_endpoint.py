@@ -1,6 +1,7 @@
 from unittest.mock import patch, MagicMock
 import requests
 
+# unit tests
 @patch('gateway.routes.requests.get')
 def test_translate_success(mock_validate, client):
     """Test successful translation request."""

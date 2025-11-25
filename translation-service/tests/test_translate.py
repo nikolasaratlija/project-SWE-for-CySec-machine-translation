@@ -3,6 +3,7 @@ from app import db
 from translation.models import Translation
 
 
+# integration test
 @patch('translation.routes.requests.post')
 def test_translate_success(mock_post, client, app):
     """Test the successful translation path writing to the real in-memory DB."""

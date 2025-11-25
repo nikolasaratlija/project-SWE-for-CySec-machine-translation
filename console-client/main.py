@@ -1,8 +1,9 @@
 import requests
 import getpass
+import os
+from cryptography.fernet import Fernet
 
 API_URL = "http://localhost:5000"  # Gateway URL
-AUTH_URL = "http://localhost:5001" # Authetication URL
 
 
 def login():
@@ -23,18 +24,18 @@ def login():
             if response.json().get("2fa_required"):
                 print("2FA required. Please enter your 6-digit code.")
                 totp_code = input("TOTP code: ")
-                totp_response = requests.post(f"{AUTH_URL}/login/totp", json={"user_id": response.json()["user_id"], "totp_code": totp_code})
+                totp_response = requests.post(f"{API_URL}/login/totp", json={"user_id": response.json()["user_id"], "totp_code": totp_code})
 
                 if totp_response.status_code == 200:
-                    print(totp_response.json()["message"])
                     token = totp_response.json()["access_token"]
                     return token
                 else:
+                    # print(response.json()["message"])
                     print("Login failed due to wrong totp code")
                     attempts += 1
                     continue
             else:
-                print(response.json()["message"])
+                # print(response.json()["message"])
                 token = response.json()["access_token"]
                 return token
         else:
@@ -49,16 +50,14 @@ def login():
 
 def translate(token):
     text = input("Text to translate: ")
-    # TODO: Select target language
-    # print("\n Select target language")
-    # print("1. Bulgarian")
-    # print("2. Dutch")
-    # target_lang = input("Select option: ")
-
+    print("\n Select target language")
+    print("Bulgarian (type bg)")
+    print("Dutch (type nl)")
+    target_language = input("Select option: ")
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.post(f"{API_URL}/translate", json={
         "text": text,
-        #"target_lang": target_lang
+        "target_language": target_language
     }, headers=headers)
 
     if response.status_code == 200:
@@ -68,7 +67,9 @@ def translate(token):
 
 def enable_2fa(token):
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.post(f"{AUTH_URL}/enable-2fa", headers=headers)
+    response = requests.post(f"{API_URL}/enable-2fa", 
+                             json={},
+                             headers=headers)
 
     # If backend returns JSON with TOTP info:
     if response.status_code == 200:
@@ -78,9 +79,13 @@ def enable_2fa(token):
 
 def logout(token):
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.post(f"{AUTH_URL}/logout", headers=headers)
+    response = requests.post(
+        f"{API_URL}/logout",
+        json={"reason": "user requested logout"},
+        headers=headers
+    )
     if response.status_code == 200:
-        print(response.json().get("messg"))
+        print(response.json().get("message"))
         return None
     else:
         print("Logout failed:", response.text)
@@ -112,6 +117,21 @@ def main_menu(token):
             print("Invalid choice.")
 
 if __name__ == "__main__":
+    # key = os.environ.get("FERNET_KEY")
+    # if not key:
+    #     raise ValueError("FERNET_KEY not found in environment")
+
+    # # Fernet expects bytes
+    # cipher = Fernet(key.encode())
+
+    # # Example usage
+    # message = b"Hello from Docker!"
+    # encrypted = cipher.encrypt(message)
+    # decrypted = cipher.decrypt(encrypted)
+
+    # print("Key:", key)
+    # print("Encrypted:", encrypted.decode())
+    # print("Decrypted:", decrypted.decode())
     token = login()
     if token:
         main_menu(token)

@@ -93,7 +93,7 @@ def login_totp():
             )
         return jsonify(access_token=access_token, message="Succesful login"), 200
     else:
-        return jsonify({"message": "Invalid TOTP code"}), 401
+        return jsonify({"message": "Invalid TOTP code "}), 401
 
 
 @auth_bp.route('/validate', methods=['GET'])
@@ -129,4 +129,4 @@ def enable_2fa():
 @jwt_required()
 def logout():
     # TODO: Blacklist token
-    return jsonify(msg="Successfully logged out"), 200
+    return jsonify({"message": "Successfully logged out"}), 200

@@ -84,6 +84,142 @@ def login():
 
     return jsonify(response.json()), response.status_code
 
+@gateway_bp.route('/login/totp', methods=['POST'])
+def login_totp():
+    """Sanitize & forward login request to the Authentication Service."""
+    data = request.get_json()
+    if data is None:
+        return jsonify({"message": "Invalid or missing JSON body"}), 400
+
+    sanitized_payload = sanitize_value(data)
+
+    # Get URL from the current app's configuration
+    auth_service_url = current_app.config['AUTH_SERVICE_URL']
+
+    response, error_response = _forward_request(
+        'POST',
+        f"{auth_service_url}/login/totp",
+        json=sanitized_payload
+    )
+
+    if error_response:
+        return error_response
+
+    return jsonify(response.json()), response.status_code
+
+@gateway_bp.route('/enable-2fa', methods=['POST'])
+def enable_2fa():
+    """
+    Enable endpoint: validates token with Auth service, then forwards enable-2fa request.
+    """
+    # Check Authorization header
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({"message": "Authorization header is required"}), 401
+
+    # Get Auth service URL from config
+    auth_service_url = current_app.config.get('AUTH_SERVICE_URL')
+    if not auth_service_url:
+        return jsonify({"message": "Auth service URL not configured"}), 500
+
+    # Validate token with Auth service
+    try:
+        validation_response = requests.get(
+            f"{auth_service_url}/validate",
+            headers={'Authorization': auth_header}
+        )
+        validation_response.raise_for_status()
+        user_id = validation_response.json().get('user_id')
+
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            return jsonify({"message": "Invalid or expired token"}), 401
+        current_app.logger.error(f"Auth service error: {e}")
+        return jsonify({"message": "Could not validate token"}), 500
+
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Auth service unreachable: {e}")
+        return jsonify({"message": "Authentication service unavailable"}), 503
+
+    #Parse JSON body
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"message": "Invalid or missing JSON body"}), 400
+
+    # Sanitize payload
+    sanitized_payload = sanitize_value(data)
+
+    # Forward enable-2fa request to Auth service
+    try:
+        response = requests.post(
+            f"{auth_service_url}/enable-2fa",
+            json=sanitized_payload,
+            headers={'Authorization': auth_header}
+        )
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Error forwarding enable-2fa: {e}")
+        return jsonify({"message": "Enable-2fa service unavailable"}), 503
+
+    # 6. Return Auth service response
+    return jsonify(response.json()), response.status_code
+
+@gateway_bp.route('/logout', methods=['POST'])
+def logout():
+    """
+    Logout endpoint: validates token with Auth service, then forwards logout request.
+    """
+    # Check Authorization header
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({"message": "Authorization header is required"}), 401
+
+    # Get Auth service URL from config
+    auth_service_url = current_app.config.get('AUTH_SERVICE_URL')
+    if not auth_service_url:
+        return jsonify({"message": "Auth service URL not configured"}), 500
+
+    # Validate token with Auth service
+    try:
+        validation_response = requests.get(
+            f"{auth_service_url}/validate",
+            headers={'Authorization': auth_header}
+        )
+        validation_response.raise_for_status()
+        user_id = validation_response.json().get('user_id')
+
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            return jsonify({"message": "Invalid or expired token"}), 401
+        current_app.logger.error(f"Auth service error: {e}")
+        return jsonify({"message": "Could not validate token"}), 500
+
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Auth service unreachable: {e}")
+        return jsonify({"message": "Authentication service unavailable"}), 503
+
+    # Parse JSON body
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"message": "Invalid or missing JSON body"}), 400
+
+    # Sanitize payload
+    sanitized_payload = sanitize_value(data)
+
+    # Forward logout request to Auth service
+    try:
+        response = requests.post(
+            f"{auth_service_url}/logout",
+            json=sanitized_payload,
+            headers={'Authorization': auth_header}
+        )
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Error forwarding logout: {e}")
+        return jsonify({"message": "Logout service unavailable"}), 503
+
+    # Return Auth service response
+    return jsonify(response.json()), response.status_code
+
+
 
 @gateway_bp.route('/translate', methods=['POST'])
 def translate():

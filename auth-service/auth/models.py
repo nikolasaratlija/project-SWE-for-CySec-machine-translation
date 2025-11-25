@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 
+
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 
@@ -12,7 +13,6 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
     totp_secret = db.Column(db.String(32), nullable=True)   # Base32 secret for TOTP
-    is_2fa_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
 
     def __init__(self, username, password, is_admin=False):

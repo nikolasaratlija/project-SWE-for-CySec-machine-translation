@@ -22,6 +22,7 @@ services:
       - DATABASE_URL=postgresql://user:password@db-auth:5432/auth_db
       - JWT_SECRET_KEY=my-super-secret-key-that-should-be-in-a-vault
       - FLASK_APP=app.py
+      - FERNET_KEY=gDworrEqfhMbEf3KXhFWkAsCZi2Lap8uhJLsKKarr0=
     depends_on:
       db-auth:
         condition: service_healthy

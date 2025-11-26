@@ -1,6 +1,7 @@
 import pyotp
 from auth.models import User
 
+# integration test
 def test_totp_login_success(client, init_database):
     """Test completing login with a valid TOTP code."""
     # 1. Get user ID (simulating step 1 of login)
@@ -20,6 +21,7 @@ def test_totp_login_success(client, init_database):
     assert 'access_token' in response.json
 
 
+# integration test
 def test_totp_login_invalid_code(client, init_database):
     """Test login with invalid TOTP code."""
     user = User.query.filter_by(username='2fauser').first()
@@ -33,6 +35,7 @@ def test_totp_login_invalid_code(client, init_database):
     assert response.json['message'] == "Invalid TOTP code"
 
 
+# integration test
 def test_enable_2fa(client, init_database):
     """Test enabling 2FA for a standard user."""
     # 1. Login as standard user to get token

@@ -14,8 +14,8 @@ services:
 
   auth-service:
     build: ./auth-service
-    ports:
-      - "5001:5001"
+    # ports:
+    #   - "5001:5001" # uncomment for debugging
     volumes:
       - ./auth-service:/app
     environment:
@@ -28,8 +28,8 @@ services:
 
   translation-service:
     build: ./translation-service
-    ports:
-      - "5002:5002"
+    # ports:
+    #   - "5002:5002" # uncomment for debugging
     volumes:
       - ./translation-service:/app
     environment:
@@ -97,8 +97,8 @@ services:
   dozzle:
     image: amir20/dozzle:latest
     container_name: dozzle
-    ports:
-      - "8080:8080"  # Expose Dozzle's web UI on port 8080
+    # ports:
+    #   - "8080:8080"  # expose if needed
     volumes:
       # Mount the Docker socket to allow Dozzle to find other containers
       - /var/run/docker.sock:/var/run/docker.sock 

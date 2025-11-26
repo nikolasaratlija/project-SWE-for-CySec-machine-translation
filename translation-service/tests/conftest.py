@@ -1,18 +1,25 @@
 import pytest
-from app import create_app
+from app import create_app, db
 
-@pytest.fixture(scope='module')
+@pytest.fixture
 def app():
     """Instance of Main Flask App configured for testing."""
-    # Pass the test config directly to the factory
     app = create_app({
         "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:" 
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "SQLALCHEMY_TRACK_MODIFICATIONS": False
     })
-    
-    yield app
 
-@pytest.fixture(scope='module')
+    # Create an application context to access the database
+    with app.app_context():
+        # Create tables for the real in-memory DB
+        db.create_all()
+        yield app
+        # Cleanup: remove session and drop tables
+        db.session.remove()
+        db.drop_all()
+
+@pytest.fixture
 def client(app):
     """A test client for the app."""
     return app.test_client()

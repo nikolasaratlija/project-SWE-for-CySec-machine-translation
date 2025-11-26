@@ -1,3 +1,4 @@
+# integration test
 def test_login_successful(client, init_database):
     """Test standard login with correct credentials."""
     response = client.post('/login', json={
@@ -8,6 +9,7 @@ def test_login_successful(client, init_database):
     assert 'access_token' in response.json
 
 
+# integration test
 def test_login_invalid_credentials(client, init_database):
     """Test login with wrong password."""
     response = client.post('/login', json={
@@ -18,6 +20,7 @@ def test_login_invalid_credentials(client, init_database):
     assert response.json['message'] == "Invalid credentials"
 
 
+# integration test
 def test_login_triggers_2fa(client, init_database):
     """Test that a 2FA enabled user gets a specific response, not a token."""
     response = client.post('/login', json={
@@ -30,13 +33,14 @@ def test_login_triggers_2fa(client, init_database):
     assert 'user_id' in response.json
 
 
+# unit test
 def test_login_validation_missing_json(client):
     """No JSON body."""
     response = client.post('/login')
     assert response.status_code == 415
-    # assert "Invalid JSON body" in response.json['message']
 
 
+# unit test
 def test_login_validation_missing_fields(client):
     """Missing username or password keys."""
     response = client.post('/login', json={'username': 'testuser'})
@@ -44,6 +48,7 @@ def test_login_validation_missing_fields(client):
     assert "Missing 'username' or 'password'" in response.json['message']
 
 
+# unit test
 def test_login_validation_types(client):
     """Wrong types (e.g. int instead of str)."""
     response = client.post('/login', json={
@@ -54,6 +59,7 @@ def test_login_validation_types(client):
     assert "must be strings" in response.json['message']
 
 
+# unit test
 def test_login_validation_empty_strings(client):
     """Empty strings."""
     response = client.post('/login', json={

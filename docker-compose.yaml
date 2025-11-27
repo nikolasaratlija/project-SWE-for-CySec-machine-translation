@@ -14,8 +14,8 @@ services:
 
   auth-service:
     build: ./auth-service
-    ports:
-      - "5001:5001"
+    # ports:
+    #   - "5001:5001" # uncomment for debugging
     volumes:
       - ./auth-service:/app
     environment:
@@ -28,16 +28,19 @@ services:
 
   translation-service:
     build: ./translation-service
-    ports:
-      - "5002:5002"
+    # ports:
+    #   - "5002:5002" # uncomment for debugging
     volumes:
       - ./translation-service:/app
     environment:
       - DATABASE_URL=postgresql://user:password@db-translation:5432/translation_db
       - FLASK_APP=app.py
+      - OLLAMA_API_URL=http://ollama:11434/api/generate
     depends_on:
       db-translation:
         condition: service_healthy
+      ollama-setup:
+        condition: service_completed_successfully
 
   db-auth:
     image: postgres:13
@@ -47,6 +50,8 @@ services:
       - POSTGRES_DB=auth_db
     volumes:
       - auth_db_data:/var/lib/postgresql/data/
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d auth_db"]
       interval: 5s
@@ -67,6 +72,38 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  ollama-setup:
+    image: appropriate/curl
+    command: >
+      sh -c "
+      echo 'Waiting for Ollama to be ready...' &&
+      until curl -s http://ollama:11434 > /dev/null; do
+        sleep 1
+      done &&
+      echo 'Ollama is ready. Pulling model...' &&
+      curl http://ollama:11434/api/pull -d '{\"name\": \"llama3\"}' &&
+      echo 'Model pulled successfully.'
+      "
+    depends_on:
+      - ollama
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    # ports:
+    #   - "8080:8080"  # expose if needed
+    volumes:
+      # Mount the Docker socket to allow Dozzle to find other containers
+      - /var/run/docker.sock:/var/run/docker.sock 
+
 volumes:
   auth_db_data:
   translation_db_data:
+  ollama_data:
